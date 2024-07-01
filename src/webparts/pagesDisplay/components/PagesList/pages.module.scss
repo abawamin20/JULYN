@@ -1,0 +1,54 @@
+.title {
+  font-size: medium;
+  font-weight: 600;
+
+  .subTitle {
+    font-weight: normal;
+    .knowledgeText {
+      color: #2492ec;
+      font-size: small;
+    }
+  }
+}
+
+.top {
+  .first-section {
+    position: relative;
+    height: 225px;
+    width: 100%;
+    overflow: hidden;
+    background: #efefef;
+    img {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+
+      background-size: cover;
+      background-repeat: no-repeat;
+      background-position: center;
+    }
+  }
+}
+
+.knowledgeText {
+  font-size: 30px;
+  color: #5f5858;
+  font-weight: 600;
+}
+
+.blueText {
+  color: #0a6fc1;
+}
+
+.pagination-btns {
+  color: #1676bf !important;
+  cursor: pointer;
+  font-size: small;
+}
+
+.disabledPagination {
+  color: #c5d7e3 !important;
+  pointer-events: none; /* To prevent clicking */
+}
