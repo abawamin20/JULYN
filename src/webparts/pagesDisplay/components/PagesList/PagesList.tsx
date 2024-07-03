@@ -3,7 +3,13 @@ import { ReusableDetailList } from "../common/ReusableDetailList";
 import PagesService from "./PagesService";
 import { WebPartContext } from "@microsoft/sp-webpart-base";
 import { PagesColumns } from "./PagesColumns";
-import { IColumn } from "@fluentui/react";
+import {
+  ContextualMenu,
+  DirectionalHint,
+  IColumn,
+  IContextualMenuItem,
+  IContextualMenuProps,
+} from "@fluentui/react";
 
 import { makeStyles, useId, Input } from "@fluentui/react-components";
 import styles from "./pages.module.scss";
@@ -24,6 +30,19 @@ const useStyles = makeStyles({
 
 const PagesList = (props: IPagesListProps) => {
   const context = props.context;
+  const getContextualMenuProps = (
+    ev: HTMLElement,
+    categoriesFilter: IContextualMenuItem[] = filterCategories
+  ): IContextualMenuProps => {
+    return {
+      items: categoriesFilter,
+      directionalHint: DirectionalHint.bottomLeftEdge,
+      target: ev,
+      gapSpace: 10,
+      isBeakVisible: true,
+    };
+  };
+
   const [catagory, setCatagory] = React.useState<string>("");
   const [pageSizeOption] = React.useState<number[]>([10, 30, 40]);
   const [searchText, setSearchText] = React.useState<string>("");
@@ -37,8 +56,19 @@ const PagesList = (props: IPagesListProps) => {
   const [endIndex, setEndIndex] = React.useState<number>(1);
   const [totalItems, setTotalItems] = React.useState<number>(0);
   const [isDecending, setIsDecending] = React.useState<boolean>(false);
+  const [filterCategory, setFilterCategory] = React.useState<string>("");
+  const [showFilter, setShowFilter] = React.useState<boolean>(false);
+  const [targetElement, setTarget] = React.useState<HTMLElement | null>(null);
+  const [catagoryOptions, setCatagoryOptions] = React.useState<string[]>([]);
+  const [filterCategories, setFilterCategories] = React.useState<
+    IContextualMenuItem[]
+  >([]);
+
   const pagesService = new PagesService(context);
   const inputId = useId("input");
+  const [contextualMenuProps, setContextualMenuProps] =
+    React.useState<IContextualMenuProps | null>(null);
+
   const inputStyles = useStyles();
 
   React.useEffect(() => {
@@ -46,6 +76,11 @@ const PagesList = (props: IPagesListProps) => {
       setCatagory(e.detail);
       getPages(e.detail);
     });
+
+    console.log(endIndex);
+    console.log(filterCategory);
+    console.log(startIndex);
+    console.log(targetElement);
   }, []);
 
   const fetchPages = (
@@ -68,21 +103,42 @@ const PagesList = (props: IPagesListProps) => {
       )
       .then((res) => {
         setTotalItems(res.length);
-        const totalPages = Math.ceil(res.length / pageSize);
+        const totalPages = Math.ceil(res.length / pageSizeAmount);
         if (totalPages === 0) {
           setTotalPages(1);
-        } else setTotalPages(Math.ceil(res.length / pageSize));
+        } else setTotalPages(Math.ceil(res.length / pageSizeAmount));
         const startIndex = 1;
         setStartIndex(startIndex);
-        const endIndex = res.slice(0, pageSize).length;
+        const endIndex = res.slice(0, pageSizeAmount).length;
         setEndIndex(endIndex);
-        setPaginatedPages(res.slice(0, pageSize));
+        setPaginatedPages(res.slice(0, pageSizeAmount));
         setPages(res);
       });
   };
 
   const getPages = (path: string) => {
     fetchPages(1, pageSize, "Created", true, searchText, path);
+  };
+
+  const constructCatagoryFilters = (catagories: string[]) => {
+    const updatedFilterCategories: IContextualMenuItem[] = [];
+
+    setCatagoryOptions(catagories);
+
+    catagories.map((category: string) => {
+      updatedFilterCategories.push({
+        key: category,
+        text: category,
+        name: category,
+        canCheck: true,
+        checked: filterCategory === category,
+        onClick: (ev, item) => {
+          setFilterCategory(category);
+        },
+      });
+    });
+    setFilterCategories(updatedFilterCategories);
+    return updatedFilterCategories;
   };
 
   const sortPages = (column: IColumn) => {
@@ -120,6 +176,7 @@ const PagesList = (props: IPagesListProps) => {
     // Slice the 'pages' array to get the current page of data
     const paginated = pages.slice(startIndex, endIndex);
 
+    setTotalPages(Math.ceil(totalItems / pageSizeChanged));
     // Update paginated pages state
     setPaginatedPages(paginated);
   };
@@ -148,17 +205,31 @@ const PagesList = (props: IPagesListProps) => {
 
   const handlePageSizeChange = (e: any) => {
     setPageSize(e.target.value);
-    fetchPages(1, e.target.value, "Created", true, searchText, catagory);
+    handlePageChange(1, e.target.value);
   };
-  console.log(endIndex);
-  console.log(startIndex);
+
+  React.useEffect(() => {
+    const catagories = ["aToZ", "zToA"];
+    setCatagoryOptions(catagories);
+    const constructedCatagoryFilters = constructCatagoryFilters(catagories);
+
+    targetElement &&
+      setContextualMenuProps(
+        getContextualMenuProps(targetElement, constructedCatagoryFilters)
+      );
+  }, [filterCategory]);
+
   return (
     <div className="w-pageSize0">
+      {showFilter && contextualMenuProps && (
+        <ContextualMenu {...contextualMenuProps} />
+      )}
       <div className={`${styles.top}`}>
         <div
           className={`${styles["first-section"]} d-flex justify-content-between align-items-end py-2 px-2`}
         >
           <img src={require("./fileImage.svg")} />
+
           <span className={`fs-4 ${styles["knowledgeText"]}`}>
             {catagory && <span className="">{catagory}</span>}
           </span>
@@ -193,7 +264,17 @@ const PagesList = (props: IPagesListProps) => {
       <ReusableDetailList
         items={paginatedPages}
         columns={PagesColumns}
-        category={catagory}
+        setShowFilter={(ev: React.MouseEvent<HTMLElement>) => {
+          setShowFilter(!showFilter);
+
+          const constructedCatagoryFilters =
+            constructCatagoryFilters(catagoryOptions);
+
+          setContextualMenuProps(
+            getContextualMenuProps(ev.currentTarget, constructedCatagoryFilters)
+          );
+          setTarget(ev.currentTarget as HTMLElement);
+        }}
         sortPages={sortPages}
         sortBy={sortBy}
         siteUrl={window.location.origin}

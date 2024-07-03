@@ -36,9 +36,9 @@ class PagesService {
           "FileRef",
           "Modified",
           "Id",
-          "Editor/Title"
+          "TaxCatchAll/Term"
         )
-        .expand("Editor")
+        .expand("TaxCatchAll")
         .skip(skip)
         .orderBy(orderBy, isAscending)();
       return pages;

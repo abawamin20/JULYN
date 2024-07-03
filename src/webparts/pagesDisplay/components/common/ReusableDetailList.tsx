@@ -36,16 +36,16 @@ const customHeaderClass = mergeStyles({
 });
 export interface IReusableDetailListcomponents {
   columns: (
-    category: string,
     onColumnClick: any,
     sortBy: string,
-    isDecending: boolean
+    isDecending: boolean,
+    setShowFilter: (ev: React.MouseEvent<HTMLElement>) => void
   ) => IColumn[];
+  setShowFilter: (ev: React.MouseEvent<HTMLElement>) => void;
   items: any[];
   sortPages: (column: IColumn, isAscending: boolean) => void;
   sortBy: string;
   siteUrl: string;
-  category: string;
   isDecending: boolean;
 }
 
@@ -80,7 +80,7 @@ export class ReusableDetailList extends React.Component<
   };
 
   public render() {
-    const { columns, items, sortPages, sortBy, category, isDecending } =
+    const { columns, items, sortPages, sortBy, isDecending, setShowFilter } =
       this.props;
 
     return (
@@ -91,7 +91,7 @@ export class ReusableDetailList extends React.Component<
           }}
           items={items}
           compact={true}
-          columns={columns(category, sortPages, sortBy, isDecending)}
+          columns={columns(sortPages, sortBy, isDecending, setShowFilter)}
           selectionMode={SelectionMode.none}
           getKey={this._getKey}
           setKey="none"
