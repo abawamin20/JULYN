@@ -39,9 +39,9 @@ export interface IReusableDetailListcomponents {
     onColumnClick: any,
     sortBy: string,
     isDecending: boolean,
-    setShowFilter: (ev: React.MouseEvent<HTMLElement>) => void
+    setShowFilter: (column: IColumn) => void
   ) => IColumn[];
-  setShowFilter: (ev: React.MouseEvent<HTMLElement>) => void;
+  setShowFilter: (column: IColumn) => void;
   items: any[];
   sortPages: (column: IColumn, isAscending: boolean) => void;
   sortBy: string;

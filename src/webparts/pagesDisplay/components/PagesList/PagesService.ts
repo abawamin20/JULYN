@@ -2,7 +2,6 @@ import { spfi, SPFI, SPFx } from "@pnp/sp";
 import "@pnp/sp/webs";
 import "@pnp/sp/lists";
 import "@pnp/sp/items";
-import { SPHttpClient, SPHttpClientResponse } from "@microsoft/sp-http";
 import { WebPartContext } from "@microsoft/sp-webpart-base";
 
 export interface ITerm {
@@ -17,81 +16,63 @@ export interface TermSet {
   terms: ITerm[];
 }
 
+export interface FilterDetail {
+  filterColumn: string;
+  values: string[];
+}
 class PagesService {
   private _sp: SPFI;
 
   constructor(private context: WebPartContext) {
     this._sp = spfi().using(SPFx(this.context));
   }
-
-  public async getTermByName(
-    termSetName: string,
-    groupId: string
-  ): Promise<string> {
-    const termsUrl = `${this.context.pageContext.web.absoluteUrl}/_api/v2.1/termStore/termgroups('${groupId}')/termsets?$filter=localizedNames/any(n:n/name eq '${termSetName}')`;
-
-    const response: SPHttpClientResponse = await this.context.spHttpClient.get(
-      termsUrl,
-      SPHttpClient.configurations.v1
-    );
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch terms: ${response.statusText}`);
-    }
-
-    const termsData = await response.json();
-
-    return termsData.value[0].id;
-  }
-
-  fetchTerms = async (
-    setId: string,
-    parentTermId?: string
-  ): Promise<ITerm[]> => {
-    const termsUrl = parentTermId
-      ? `${this.context.pageContext.web.absoluteUrl}/_api/v2.1/termStore/termSets('${setId}')/terms('${parentTermId}')/getlegacychildren`
-      : `${this.context.pageContext.web.absoluteUrl}/_api/v2.1//termStore/termSets('${setId}')/getlegacychildren`;
-
+  getDistinctValues = async (columnName: string, values: any) => {
     try {
-      const response = await this.context.spHttpClient.get(
-        termsUrl,
-        SPHttpClient.configurations.v1
-      );
-      if (!response.ok) {
-        throw new Error("Failed to fetch terms");
-      }
-      const termsData = await response.json();
+      const items = values;
 
-      const terms = await Promise.all(
-        termsData.value.map(async (term: any) => {
-          const children =
-            term.childrenCount > 0 ? await this.fetchTerms(setId, term.id) : [];
-          return {
-            Id: term.id, // Use term ID
-            Name: term.labels.length > 0 ? term.labels[0].name : "",
-            Children: children,
-          };
-        })
-      );
+      // Extract distinct values from the Title column
+      const distinctValues: string[] = [];
+      const seenValues = new Set<string>();
 
-      return terms;
+      items.forEach((item: any) => {
+        if (columnName === "Categories") {
+          if (item.TaxCatchAll && item.TaxCatchAll.length > 0) {
+            // Extract distinct values from the TaxCatchAll column
+            item.TaxCatchAll.forEach((category: any) => {
+              const uniqueValue = category.Term;
+              if (!seenValues.has(uniqueValue)) {
+                seenValues.add(uniqueValue);
+                distinctValues.push(uniqueValue);
+              }
+            });
+          }
+        } else {
+          let uniqueValue = item[columnName];
+
+          // Handle ISO date strings by extracting only the date part
+          if (columnName === "Modified" && uniqueValue) {
+            uniqueValue = new Date(uniqueValue).toISOString().split("T")[0];
+          }
+
+          if (uniqueValue && !seenValues.has(uniqueValue)) {
+            seenValues.add(uniqueValue);
+            distinctValues.push(uniqueValue);
+          }
+        }
+      });
+
+      return distinctValues;
     } catch (error) {
-      console.error(`Error fetching terms for set ${setId}:`, error);
-      return [];
+      console.error(
+        `Error fetching distinct values for column ${columnName}:`,
+        error
+      );
+      throw new Error(
+        `Error fetching distinct values for column ${columnName}`
+      );
     }
   };
 
-  public buildHierarchy(
-    terms: ITerm[],
-    parentId: string | null = null
-  ): ITerm[] {
-    return terms
-      .filter((term) => term.parentId === parentId)
-      .map((term) => ({
-        ...term,
-        children: this.buildHierarchy(terms, term.Id),
-      }));
-  }
   getFilteredPages = async (
     pageNumber: number,
     pageSize: number = 10,
@@ -99,7 +80,7 @@ class PagesService {
     isAscending: boolean = true,
     folderPath: string = "",
     searchText: string = "",
-    categories: string[] = []
+    filters: FilterDetail[]
   ) => {
     try {
       const skip = (pageNumber - 1) * pageSize;
@@ -108,16 +89,36 @@ class PagesService {
       // Use startswith to include files in subfolders and exclude folders
       let filterQuery = `startswith(FileDirRef, '${folderPath}') and FSObjType eq 0${
         searchText
-          ? ` and (substringof('${searchText}', Title) or ArticleId eq '${searchText}' or substringof('${searchText}', Modified))`
+          ? ` and (substringof('${searchText}', Title) or Article_x0020_ID eq '${searchText}' or substringof('${searchText}', Modified))`
           : ""
       }`;
 
-      if (categories.length > 0) {
-        const categoryFilters = categories
-          .map((category) => `TaxCatchAll/Term eq '${category}'`)
-          .join(" or ");
-        filterQuery += ` and (${categoryFilters})`;
-      }
+      filters.forEach((filter) => {
+        if (filter.values.length > 0) {
+          if (filter.filterColumn === "Categories") {
+            const categoryFilters = filter.values
+              .map((value) => `TaxCatchAll/Term eq '${value}'`)
+              .join(" or ");
+            filterQuery += ` and (${categoryFilters})`;
+          } else if (filter.filterColumn === "Modified") {
+            const dateFilters = filter.values
+              .map((value) => {
+                const startDate = new Date(value);
+                const endDate = new Date(value);
+                endDate.setDate(endDate.getDate() + 1); // Include the entire day
+
+                return `Modified ge datetime'${startDate.toISOString()}' and Modified lt datetime'${endDate.toISOString()}'`;
+              })
+              .join(" or ");
+            filterQuery += ` and (${dateFilters})`;
+          } else {
+            const columnFilters = filter.values
+              .map((value) => `${filter.filterColumn} eq '${value}'`)
+              .join(" or ");
+            filterQuery += ` and (${columnFilters})`;
+          }
+        }
+      });
 
       const pages: any[] = await list.items
         .filter(filterQuery)
@@ -129,7 +130,7 @@ class PagesService {
           "Modified",
           "Id",
           "TaxCatchAll/Term",
-          "ArticleId"
+          "Article_x0020_ID"
         )
         .expand("TaxCatchAll")
         .skip(skip)

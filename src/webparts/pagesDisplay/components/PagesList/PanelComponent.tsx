@@ -2,16 +2,14 @@ import * as React from "react";
 import { Panel } from "@fluentui/react/lib/Panel";
 import { Checkbox, Stack } from "@fluentui/react";
 import { DefaultButton, PrimaryButton } from "@fluentui/react/lib/Button";
-// Used to add spacing between example checkboxes
-const stackTokens = { childrenGap: 10 };
 import { useId, Input } from "@fluentui/react-components";
+import PagesService from "./PagesService";
+import { FilterDetail } from "./PagesService";
 
 export interface FilterOptions {
   key: string;
   text: string;
   value: string;
-  checked?: boolean;
-  onClick?: () => void;
 }
 
 const buttonStyles = { root: { marginRight: 8 } };
@@ -19,28 +17,45 @@ const buttonStyles = { root: { marginRight: 8 } };
 export const FilterPanelComponent = ({
   isOpen,
   dismissPanel,
-  options,
   applyFilters,
-  resetFilters,
   headerText,
   selectedItems,
+  pagesService,
+  columnName,
+  data,
 }: {
   isOpen: boolean;
   dismissPanel: () => void;
-  options: FilterOptions[];
-  applyFilters: (filters: string[]) => void;
-  resetFilters: () => void;
+  applyFilters: (filterDetail: FilterDetail) => void;
   headerText: string;
-  selectedItems: string[];
+  selectedItems: FilterDetail;
+  pagesService: PagesService;
+  columnName: string;
+  data: any[];
 }) => {
   const [checkedItems, setCheckedItems] =
-    React.useState<string[]>(selectedItems);
+    React.useState<FilterDetail>(selectedItems);
   const [searchText, setSearchText] = React.useState<string>("");
-  const [filteredOptions, setFilteredOptions] =
-    React.useState<FilterOptions[]>(options);
+  const [filteredOptions, setFilteredOptions] = React.useState<FilterOptions[]>(
+    []
+  );
+  const [options, setOptions] = React.useState<FilterOptions[]>([]);
 
   const apply = () => {
-    applyFilters(checkedItems);
+    const filterDetail: FilterDetail = {
+      filterColumn: columnName,
+      values: checkedItems.values,
+    };
+    applyFilters(filterDetail);
+  };
+
+  const resetFilters = () => {
+    const filterDetail: FilterDetail = {
+      filterColumn: columnName,
+      values: [],
+    };
+    setCheckedItems(filterDetail);
+    applyFilters(filterDetail);
   };
 
   const handleSearch = () => {
@@ -51,20 +66,37 @@ export const FilterPanelComponent = ({
     setFilteredOptions(filteredData);
   };
 
+  const constructCategoryFilters = (categories: string[]) => {
+    const updatedFilterCategories: FilterOptions[] = categories.map(
+      (category) => ({
+        key: category,
+        text: category,
+        value: category,
+      })
+    );
+
+    setOptions(updatedFilterCategories);
+    setFilteredOptions(updatedFilterCategories); // Set filtered options initially with all categories
+
+    return updatedFilterCategories;
+  };
+
   React.useEffect(() => {
-    setFilteredOptions(options);
-  }, [checkedItems, options]);
+    pagesService.getDistinctValues(columnName, data).then((res) => {
+      constructCategoryFilters(res);
+    });
+  }, [columnName]);
 
   const onRenderFooterContent = () => (
     <div>
       <PrimaryButton onClick={apply} styles={buttonStyles}>
-        Save
+        Apply
       </PrimaryButton>
       <DefaultButton
         onClick={() => {
           resetFilters();
-          setCheckedItems([]);
-          setFilteredOptions(options);
+          setCheckedItems({ filterColumn: columnName, values: [] }); // Reset checked items to empty array
+          setFilteredOptions(options); // Reset filtered options (if needed)
         }}
       >
         Clear
@@ -102,19 +134,29 @@ export const FilterPanelComponent = ({
           }}
         />
 
-        <Stack tokens={stackTokens}>
+        <Stack tokens={{ childrenGap: 10 }}>
           {filteredOptions.map((option) => (
             <Checkbox
               key={option.key}
-              label={option.text}
-              checked={checkedItems.indexOf(option.value) !== -1}
+              label={
+                isISODateString(option.text)
+                  ? new Date(option.text).toLocaleDateString()
+                  : option.text
+              }
+              checked={checkedItems.values.indexOf(option.value) !== -1}
               onChange={(ev, checked) => {
                 if (checked) {
-                  setCheckedItems([...checkedItems, option.value]);
+                  setCheckedItems({
+                    filterColumn: columnName,
+                    values: [...checkedItems.values, option.value],
+                  });
                 } else {
-                  setCheckedItems(
-                    checkedItems.filter((item) => item !== option.value)
-                  );
+                  setCheckedItems({
+                    filterColumn: columnName,
+                    values: checkedItems.values.filter(
+                      (item) => item !== option.value
+                    ),
+                  });
                 }
               }}
             />
@@ -124,3 +166,8 @@ export const FilterPanelComponent = ({
     </div>
   );
 };
+
+// Function to check if a string is in ISO date format
+function isISODateString(value: string): boolean {
+  return /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z?/.test(value);
+}

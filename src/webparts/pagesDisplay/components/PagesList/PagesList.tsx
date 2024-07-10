@@ -1,14 +1,14 @@
 import * as React from "react";
 import { ReusableDetailList } from "../common/ReusableDetailList";
-import PagesService, { ITerm, TermSet } from "./PagesService";
+import PagesService, { FilterDetail } from "./PagesService";
 import { WebPartContext } from "@microsoft/sp-webpart-base";
 import { PagesColumns } from "./PagesColumns";
-import { IColumn } from "@fluentui/react";
+import { DefaultButton, IColumn } from "@fluentui/react";
 
 import { makeStyles, useId, Input } from "@fluentui/react-components";
 import styles from "./pages.module.scss";
 import "./pages.css";
-import { FilterOptions, FilterPanelComponent } from "./PanelComponent";
+import { FilterPanelComponent } from "./PanelComponent";
 
 export interface IPagesListProps {
   context: WebPartContext;
@@ -27,9 +27,12 @@ const PagesList = (props: IPagesListProps) => {
   const context = props.context;
 
   const [catagory, setCatagory] = React.useState<string>("");
-  const [pageSizeOption] = React.useState<number[]>([10, 30, 40]);
+  const [pageSizeOption] = React.useState<number[]>([
+    10, 15, 20, 40, 60, 80, 100,
+  ]);
   const [searchText, setSearchText] = React.useState<string>("");
   const [pages, setPages] = React.useState<any[]>([]);
+  const [initialPages, setInitialPages] = React.useState<any[]>([]);
   const [paginatedPages, setPaginatedPages] = React.useState<any[]>([]);
   const [sortBy, setSortBy] = React.useState<string>("");
   const [currentPageNumber, setCurrentPageNumber] = React.useState<number>(1);
@@ -39,12 +42,9 @@ const PagesList = (props: IPagesListProps) => {
   const [endIndex, setEndIndex] = React.useState<number>(1);
   const [totalItems, setTotalItems] = React.useState<number>(0);
   const [isDecending, setIsDecending] = React.useState<boolean>(false);
-  const [filterCategory, setFilterCategory] = React.useState<string[]>([]);
   const [showFilter, setShowFilter] = React.useState<boolean>(false);
-
-  const [catagoryOptions, setCatagoryOptions] = React.useState<FilterOptions[]>(
-    []
-  );
+  const [filterColumn, setFilterColumn] = React.useState<string>("");
+  const [filterDetails, setFilterDetails] = React.useState<FilterDetail[]>([]);
 
   const pagesService = new PagesService(context);
   const inputId = useId("input");
@@ -52,7 +52,7 @@ const PagesList = (props: IPagesListProps) => {
   const inputStyles = useStyles();
 
   const resetFilters = () => {
-    setFilterCategory([]);
+    setFilterDetails([]);
     setSearchText("");
     fetchPages(1, pageSize, "Created", true, "", catagory, []);
   };
@@ -64,10 +64,10 @@ const PagesList = (props: IPagesListProps) => {
     isSortedDescending = isDecending,
     searchText = "",
     category = catagory,
-    filterCategorySelected = filterCategory
+    filterDetails: FilterDetail[]
   ) => {
     const url = `${context.pageContext.web.serverRelativeUrl}/SitePages/${category}`;
-    pagesService
+    return pagesService
       .getFilteredPages(
         page,
         pageSizeAmount,
@@ -75,7 +75,7 @@ const PagesList = (props: IPagesListProps) => {
         isSortedDescending,
         url,
         searchText,
-        filterCategorySelected
+        filterDetails
       )
       .then((res) => {
         setTotalItems(res.length);
@@ -89,72 +89,50 @@ const PagesList = (props: IPagesListProps) => {
         setEndIndex(endIndex);
         setPaginatedPages(res.slice(0, pageSizeAmount));
         setPages(res);
+        return res;
       });
   };
 
-  const getPages = (path: string, filterCategories: string[]) => {
-    fetchPages(
+  const getPages = async (path: string, filterCategories: string[]) => {
+    const initialPagesFromApi = await fetchPages(
       1,
       pageSize,
       "Created",
       true,
       searchText,
       path,
-      filterCategories
+      filterDetails
     );
+    setInitialPages(initialPagesFromApi);
   };
 
-  const getTermHierarchy = async (
-    termId: string,
-    termSetId: string
-  ): Promise<TermSet[]> => {
-    try {
-      const terms = await pagesService.fetchTerms(termSetId, termId);
-      const termSets: TermSet[] = [];
+  const applyFilters = (filterDetail: FilterDetail): void => {
+    let currentFilters: FilterDetail[] = [];
 
-      termSets.push({
-        setId: termSetId,
-        terms: terms,
-      });
-
-      return termSets;
-    } catch (error) {
-      console.error(error);
-      return [];
+    if (filterDetail.values.length > 0) {
+      // Update or add filter detail for the specified column
+      currentFilters = [
+        ...filterDetails.filter((item) => item.filterColumn !== filterColumn),
+        { filterColumn, values: filterDetail.values },
+      ];
+    } else {
+      // Remove filter detail for the specified column
+      currentFilters = filterDetails.filter(
+        (item) => item.filterColumn !== filterColumn
+      );
     }
-  };
+    console.log(currentFilters);
 
-  const constructCatagoryFilters = (categories: ITerm[]) => {
-    const updatedFilterCategories: FilterOptions[] = [];
-
-    const processCategory = (category: ITerm) => {
-      // Add the current category to the filter options
-      updatedFilterCategories.push({
-        key: category.Id,
-        text: category.Name,
-        value: category.Name,
-      });
-
-      // Recursively process child categories
-      if (category.Children && category.Children.length > 0) {
-        category.Children.forEach((child: ITerm) => {
-          processCategory(child);
-        });
-      }
-    };
-
-    categories.forEach((category: ITerm) => {
-      processCategory(category);
-    });
-
-    setCatagoryOptions(updatedFilterCategories);
-
-    return updatedFilterCategories;
-  };
-
-  const applyFilters = (filters: string[]): void => {
-    setFilterCategory(filters);
-    fetchPages(1, pageSize, "Created", true, searchText, catagory, filters);
+    setFilterDetails(currentFilters); // Update filter details state
+    fetchPages(
+      1, // Page number
+      pageSize, // Page size
+      "Created", // Sorting criteria
+      true, // Sorting order (ascending/descending)
+      searchText, // Search text
+      catagory, // Category (assuming this is another state or prop)
+      currentFilters // Updated filter details
+    );
   };
 
   const sortPages = (column: IColumn) => {
@@ -169,7 +147,9 @@ const PagesList = (props: IPagesListProps) => {
       pageSize,
       column.fieldName,
       column.isSortedDescending,
-      searchText
+      searchText,
+      catagory,
+      filterDetails
     );
   };
 
@@ -198,7 +178,15 @@ const PagesList = (props: IPagesListProps) => {
   };
 
   const handleSearch = () => {
-    fetchPages(1, pageSize, "Created", true, searchText);
+    fetchPages(
+      1,
+      pageSize,
+      "Created",
+      true,
+      searchText,
+      catagory,
+      filterDetails
+    );
   };
 
   const goToFirstPage = () => handlePageChange(1);
@@ -228,16 +216,11 @@ const PagesList = (props: IPagesListProps) => {
     window.addEventListener("category", (e: any) => {
       const details: {
         category: string;
-        setId: string;
         filterCategory: string[];
-        termId: string;
       } = e.detail;
       setCatagory(details.category);
       getPages(details.category, details.filterCategory);
-      setFilterCategory(details.filterCategory);
-      getTermHierarchy(details.termId, details.setId).then((res) => {
-        setCatagoryOptions(constructCatagoryFilters(res[0].terms));
-      });
+      // setFilterCategory(details.filterCategory);
     });
 
     console.log(endIndex);
@@ -254,11 +237,16 @@ const PagesList = (props: IPagesListProps) => {
         <FilterPanelComponent
           isOpen={showFilter}
           headerText="Filter Articles"
-          resetFilters={resetFilters}
           applyFilters={applyFilters}
           dismissPanel={dissmissPanel}
-          options={catagoryOptions}
-          selectedItems={filterCategory}
+          selectedItems={
+            filterDetails.filter(
+              (item) => item.filterColumn === filterColumn
+            )[0] || { filterColumn: "", values: [] }
+          }
+          columnName={filterColumn}
+          pagesService={pagesService}
+          data={initialPages}
         />
       )}
       <div className={`${styles.top}`}>
@@ -289,6 +277,15 @@ const PagesList = (props: IPagesListProps) => {
           <span>Articles /</span>
           {totalItems > 0 ? (
             <div className="d-flex align-items-center">
+              {filterDetails && filterDetails.length > 0 && (
+                <DefaultButton
+                  onClick={() => {
+                    resetFilters();
+                  }}
+                >
+                  Clear
+                </DefaultButton>
+              )}
               <span className="ms-2 fs-6">Results ({totalItems})</span>
             </div>
           ) : (
@@ -300,10 +297,9 @@ const PagesList = (props: IPagesListProps) => {
       <ReusableDetailList
         items={paginatedPages}
         columns={PagesColumns}
-        setShowFilter={(ev: React.MouseEvent<HTMLElement>) => {
+        setShowFilter={(column: IColumn) => {
           setShowFilter(!showFilter);
-
-          ev.stopPropagation();
+          setFilterColumn(column.fieldName as string);
         }}
         sortPages={sortPages}
         sortBy={sortBy}

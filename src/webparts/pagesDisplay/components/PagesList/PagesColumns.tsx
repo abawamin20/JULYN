@@ -1,51 +1,83 @@
 import * as React from "react";
-import { IColumn } from "@fluentui/react";
+import { IColumn, IDetailsColumnProps } from "@fluentui/react";
+import { Icon } from "@fluentui/react/lib/Icon"; // Import Icon component from Fluent UI
+
 export const PagesColumns = (
-  onColumnClick: any,
+  onColumnClick: (column: IColumn) => void,
   sortBy: string,
-  isDecending: boolean,
-  setShowFilter: (ev: React.MouseEvent<HTMLElement>) => void
+  isDescending: boolean,
+  setShowFilter: (column: IColumn) => void
 ): IColumn[] => {
-  const onColumnContextMenu = (
-    column: IColumn,
-    ev: React.MouseEvent<HTMLElement>
-  ): void => {
-    setShowFilter(ev);
+  const onRenderHeader = (column: IColumn): JSX.Element => {
+    return (
+      <div
+        style={{
+          display: "flex",
+          alignItems: "start",
+          justifyContent: "space-between",
+          width: "100%", // Adjust padding as needed
+          boxSizing: "border-box",
+        }}
+      >
+        <span
+          onClick={() => {
+            if (column.fieldName !== "Categories") {
+              onColumnClick(column);
+            }
+          }}
+          style={{
+            flex: 1,
+            cursor: "pointer",
+          }}
+        >
+          {column.name}
+        </span>
+        <Icon
+          iconName="Filter"
+          onClick={() => setShowFilter(column)}
+          style={{ cursor: "pointer" }}
+        />
+      </div>
+    );
   };
 
   return [
     {
       key: "Id",
       name: "Article Id",
-      fieldName: "ArticleId",
-      minWidth: 30,
-      maxWidth: 60,
+      fieldName: "Article_x0020_ID",
+      minWidth: 60,
+      maxWidth: 80,
       isRowHeader: true,
       isResizable: true,
       data: "string",
       isPadded: true,
-      isSorted: sortBy === "ArticleId",
-      isSortedDescending: isDecending,
-      onColumnClick: (e, column: IColumn) => onColumnClick(column),
+      isSorted: sortBy === "Article_x0020_ID",
+      isSortedDescending: isDescending,
+      onRenderHeader: (item: IDetailsColumnProps) =>
+        onRenderHeader(item.column),
     },
     {
       key: "Title",
       name: "Title",
       fieldName: "Title",
       minWidth: 200,
-      maxWidth: 600,
+      maxWidth: 400,
       isRowHeader: true,
       isResizable: true,
       isSorted: sortBy === "Title",
-      onColumnClick: (e, column: IColumn) => onColumnClick(column),
+      isSortedDescending: isDescending,
+      onRenderHeader: (item: IDetailsColumnProps) =>
+        onRenderHeader(item.column),
       data: "string",
       isPadded: true,
-      isSortedDescending: isDecending,
       onRender(item) {
         return (
-          <a href={item.FileRef} className="" target="_blank">
-            {item.Title}
-          </a>
+          <div>
+            <a href={item.FileRef} className="" target="_blank">
+              {item.Title}
+            </a>
+          </div>
         );
       },
     },
@@ -58,20 +90,18 @@ export const PagesColumns = (
       isRowHeader: true,
       isResizable: true,
       isSorted: false,
-      onColumnContextMenu(column: IColumn, ev: React.MouseEvent<HTMLElement>) {
-        onColumnContextMenu(column, ev);
-      },
-      onColumnClick: (ev, column) => {
-        onColumnContextMenu(column, ev);
-      },
       data: "string",
       isPadded: true,
-      onRender: (item) => {
+      onRenderHeader: (item: IDetailsColumnProps) =>
+        onRenderHeader(item.column),
+      onRender(item) {
         const categories = item.TaxCatchAll.map(
           (category: any) => category.Term
         );
         return (
-          <span title={categories.join(", ")}>{categories.join(", ")}</span>
+          <div>
+            <span title={categories.join(", ")}>{categories.join(", ")}</span>
+          </div>
         );
       },
     },
@@ -84,10 +114,11 @@ export const PagesColumns = (
       isRowHeader: true,
       isResizable: true,
       isSorted: sortBy === "Modified",
-      onColumnClick: (e, column: IColumn) => onColumnClick(column),
+      onRenderHeader: (item: IDetailsColumnProps) =>
+        onRenderHeader(item.column),
+      isSortedDescending: isDescending,
       data: "string",
       isPadded: true,
-      isSortedDescending: isDecending,
       onRender(item) {
         const date = new Date(item.Modified);
 
@@ -106,7 +137,7 @@ export const PagesColumns = (
         const formattedTime = date.toLocaleTimeString("en-US", optionsTime);
 
         const formattedDateTime = `${formattedDate} ${formattedTime}`;
-        return formattedDateTime;
+        return <div>{formattedDateTime}</div>;
       },
     },
   ];
