@@ -4,32 +4,33 @@ import { Version } from "@microsoft/sp-core-library";
 import {
   IPropertyPaneConfiguration,
   IPropertyPaneDropdownOption,
+  PropertyPaneDropdown,
 } from "@microsoft/sp-property-pane";
 import { BaseClientSideWebPart } from "@microsoft/sp-webpart-base";
 import { IReadonlyTheme } from "@microsoft/sp-component-base";
 import { SPHttpClient } from "@microsoft/sp-http";
 
-import * as strings from "TermSetWebPartStrings";
-import { ITermSetProps } from "./components/ITermSetProps";
+import * as strings from "SurveyWebPartStrings";
+import { ISurveyProps } from "./components/ISurveyProps";
 import TermSetList from "./components/TermSet";
 import { PropertyFieldMultiSelect } from "@pnp/spfx-property-controls/lib/PropertyFieldMultiSelect";
 
-export interface ITermSetWebPartProps {
+export interface ISurveyWebPartProps {
   description: string;
   multiSelect: string[];
   selectedGroupId: string;
 }
 
-export default class TermSetWebPart extends BaseClientSideWebPart<ITermSetWebPartProps> {
-  private groupId: string = "26906ffe-f340-4248-84d4-b961570a6ded";
+export default class SurveyWebPart extends BaseClientSideWebPart<ISurveyWebPartProps> {
   private termSetOptions: IPropertyPaneDropdownOption[] = [];
+  private termStoreGroupOptions: IPropertyPaneDropdownOption[] = [];
 
   public async render(): Promise<void> {
-    const element: React.ReactElement<ITermSetProps> = React.createElement(
+    const element: React.ReactElement<ISurveyProps> = React.createElement(
       TermSetList,
       {
         context: this.context,
-        groupId: this.groupId,
+        groupId: this.properties.selectedGroupId,
         setNames: this.properties.multiSelect,
       }
     );
@@ -58,6 +59,25 @@ export default class TermSetWebPart extends BaseClientSideWebPart<ITermSetWebPar
         };
       }),
     ];
+  }
+  protected onInit(): Promise<void> {
+    return this.getTermStoreGroups();
+  }
+
+  private async getTermStoreGroups(): Promise<void> {
+    const url = `${this.context.pageContext.web.absoluteUrl}/_api/v2.1/termstore/groups`;
+    const response = await this.context.spHttpClient.get(
+      url,
+      SPHttpClient.configurations.v1
+    );
+    const data = await response.json();
+
+    this.termStoreGroupOptions = data.value.map((group: any) => {
+      return {
+        key: group.id,
+        text: group.name,
+      };
+    });
   }
 
   protected onThemeChanged(currentTheme: IReadonlyTheme | undefined): void {
@@ -89,9 +109,25 @@ export default class TermSetWebPart extends BaseClientSideWebPart<ITermSetWebPar
   }
 
   protected async onPropertyPaneConfigurationStart(): Promise<void> {
-    // Load the term sets if not already loaded
-    if (this.termSetOptions.length === 0) {
-      await this.getTermSets(this.groupId);
+    // Load the term store groups if not already loaded
+    if (this.termStoreGroupOptions.length === 0) {
+      await this.getTermStoreGroups();
+    }
+
+    if (this.termSetOptions.length === 0 && this.properties.selectedGroupId) {
+      await this.getTermSets(this.properties.selectedGroupId);
+    }
+
+    this.context.propertyPane.refresh();
+  }
+
+  protected async onPropertyPaneFieldChanged(
+    propertyPath: string,
+    oldValue: any,
+    newValue: any
+  ): Promise<void> {
+    if (propertyPath === "selectedGroupId" && newValue) {
+      await this.getTermSets(newValue);
       this.context.propertyPane.refresh();
     }
   }
@@ -107,6 +143,11 @@ export default class TermSetWebPart extends BaseClientSideWebPart<ITermSetWebPar
             {
               groupName: strings.BasicGroupName,
               groupFields: [
+                PropertyPaneDropdown("selectedGroupId", {
+                  label: "Select Term Store Group",
+                  options: this.termStoreGroupOptions,
+                  selectedKey: this.properties.selectedGroupId,
+                }),
                 PropertyFieldMultiSelect("multiSelect", {
                   key: "multiSelect",
                   label: "Multi select field",

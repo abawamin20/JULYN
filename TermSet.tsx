@@ -35,7 +35,6 @@ const TermSetList: React.FC<TermSetListProps> = (props: TermSetListProps) => {
 
   React.useEffect(() => {
     window.addEventListener("contentLoaded", function () {
-      console.log(38);
       const navSection: any = document.querySelector(".custom-nav");
       const detailSection: any = document.querySelector(".detail-display");
 
@@ -154,7 +153,7 @@ const TermSetList: React.FC<TermSetListProps> = (props: TermSetListProps) => {
     } else {
       setTermSets([]);
     }
-  }, [props.context, setNames]);
+  }, [props.context, setNames, groupId]);
 
   const handleTermClick = (term: Term) => {
     setSelectedTermId(term.Id);
