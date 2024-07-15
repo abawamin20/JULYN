@@ -23,6 +23,7 @@ const customBodyClass = mergeStyles({
   overflowY: "auto",
   maxHeight: "700px",
 });
+
 // Define custom header styles
 const customHeaderClass = mergeStyles({
   backgroundColor: "#efefef", // Custom background color
@@ -34,6 +35,7 @@ const customHeaderClass = mergeStyles({
     borderBottom: "1px solid #ccc",
   },
 });
+
 export interface IReusableDetailListcomponents {
   columns: (
     onColumnClick: any,
@@ -57,12 +59,38 @@ export class ReusableDetailList extends React.Component<
     super(components);
   }
 
+  componentDidMount() {
+    window.addEventListener("contentLoaded", this.handleContentLoaded);
+  }
+
+  componentWillUnmount() {
+    window.removeEventListener("contentLoaded", this.handleContentLoaded);
+  }
+
   componentDidUpdate(prevcomponents: IReusableDetailListcomponents) {
     if (prevcomponents.items !== this.props.items) {
       this.forceUpdate();
+      window.dispatchEvent(new Event("contentLoaded"));
     }
   }
 
+  handleContentLoaded = () => {
+    const navSection: HTMLElement | null =
+      document.querySelector(".custom-nav");
+    const detailSection: HTMLElement | null =
+      document.querySelector(".detail-display");
+
+    function adjustNavHeight() {
+      if (navSection && detailSection) {
+        const detailHeight = detailSection.offsetHeight;
+        const minHeight = 500; // Minimum height in pixels
+        navSection.style.height = `${Math.max(detailHeight, minHeight)}px`;
+      }
+    }
+
+    adjustNavHeight();
+    window.addEventListener("resize", adjustNavHeight);
+  };
   _onRenderDetailsHeader = (components: any) => {
     if (!components) {
       return null;

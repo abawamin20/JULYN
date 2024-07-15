@@ -41,32 +41,64 @@ export const FilterPanelComponent = ({
   );
   const [options, setOptions] = React.useState<FilterOptions[]>([]);
 
+  /**
+   * Apply the filters by calling the applyFilters function
+   * with the current checked items.
+   */
   const apply = () => {
+    // Create a filter detail object with the column name and values
     const filterDetail: FilterDetail = {
       filterColumn: columnName,
       values: checkedItems.values,
     };
+
+    // Call the applyFilters function with the filter detail
     applyFilters(filterDetail);
   };
 
+  /**
+   * Reset the filters by clearing the checked items and
+   * calling the applyFilters function with an empty filter detail.
+   */
   const resetFilters = () => {
+    // Create a filter detail object with an empty array of values
     const filterDetail: FilterDetail = {
       filterColumn: columnName,
       values: [],
     };
+
+    // Update the checked items state with the filter detail
     setCheckedItems(filterDetail);
+
+    // Call the applyFilters function with the filter detail
     applyFilters(filterDetail);
   };
 
+  /**
+   * Handles the search input change event by filtering the options
+   * based on the search text and updating the filtered options state.
+   */
   const handleSearch = () => {
+    // Convert the search text to lowercase for case-insensitive search
     const lowercasedFilter = searchText.toLowerCase();
+
+    // Filter the options based on the search text
     const filteredData = options.filter(
       (item) => item.text.toLowerCase().indexOf(lowercasedFilter) !== -1
     );
+
+    // Update the filtered options state with the filtered data
     setFilteredOptions(filteredData);
   };
 
+  /**
+   * Constructs filter options for the given categories.
+   *
+   * @param categories - The list of categories to create filter options for.
+   * @returns An array of FilterOptions for the categories.
+   */
   const constructCategoryFilters = (categories: string[]) => {
+    // Map categories to FilterOptions
     const updatedFilterCategories: FilterOptions[] = categories.map(
       (category) => ({
         key: category,
@@ -75,14 +107,24 @@ export const FilterPanelComponent = ({
       })
     );
 
+    // Set the options state with the updated filter categories
     setOptions(updatedFilterCategories);
-    setFilteredOptions(updatedFilterCategories); // Set filtered options initially with all categories
+
+    // Set the filtered options state with all categories initially
+    setFilteredOptions(updatedFilterCategories);
 
     return updatedFilterCategories;
   };
 
+  /**
+   * Effect hook that runs when the columnName prop changes.
+   * This effect fetches distinct values for the columnName from the pagesService
+   * and constructs category filters using the result.
+   */
   React.useEffect(() => {
+    // Fetch distinct values for the columnName from the pagesService
     pagesService.getDistinctValues(columnName, data).then((res) => {
+      // Construct category filters using the result and update the options state
       constructCategoryFilters(res);
     });
   }, [columnName]);

@@ -1,12 +1,20 @@
 import * as React from "react";
 import { IColumn, IDetailsColumnProps } from "@fluentui/react";
 import { Icon } from "@fluentui/react/lib/Icon"; // Import Icon component from Fluent UI
-
+/**
+ * Returns an array of IColumn objects representing the columns of the PagesDetailsList component.
+ *
+ * @param {(column: IColumn) => void} onColumnClick - The function to call when a column is clicked.
+ * @param {string} sortBy - The column to sort by.
+ * @param {boolean} isDescending - Whether the sort order is descending.
+ * @param {(column: IColumn) => void} setShowFilter - The function to set the showFilter state.
+ * @return {IColumn[]} An array of IColumn objects representing the columns of the PagesDetailsList component.
+ */
 export const PagesColumns = (
-  onColumnClick: (column: IColumn) => void,
-  sortBy: string,
-  isDescending: boolean,
-  setShowFilter: (column: IColumn) => void
+  onColumnClick: (column: IColumn) => void, // The function to call when a column is clicked
+  sortBy: string, // The column to sort by
+  isDescending: boolean, // Whether the sort order is descending
+  setShowFilter: (column: IColumn) => void // The function to set the showFilter state
 ): IColumn[] => {
   const onRenderHeader = (column: IColumn): JSX.Element => {
     return (

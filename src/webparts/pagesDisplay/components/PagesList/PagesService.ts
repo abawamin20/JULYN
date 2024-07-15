@@ -26,13 +26,19 @@ class PagesService {
   constructor(private context: WebPartContext) {
     this._sp = spfi().using(SPFx(this.context));
   }
+  /**
+   * Fetch distinct values for a given column from a list of items.
+   * @param {string} columnName - The name of the column to fetch distinct values for.
+   * @param {any[]} values - The list of items to extract distinct values from.
+   * @returns {Promise<string[]>} - A promise that resolves to an array of distinct values.
+   */
   getDistinctValues = async (columnName: string, values: any) => {
     try {
-      const items = values;
+      const items = values; // The list of items to fetch distinct values from.
 
       // Extract distinct values from the Title column
       const distinctValues: string[] = [];
-      const seenValues = new Set<string>();
+      const seenValues = new Set<string>(); // A set to keep track of seen values to avoid duplicates.
 
       items.forEach((item: any) => {
         if (columnName === "Categories") {
@@ -47,7 +53,7 @@ class PagesService {
             });
           }
         } else {
-          let uniqueValue = item[columnName];
+          let uniqueValue = item[columnName]; // The value of the column for the current item.
 
           // Handle ISO date strings by extracting only the date part
           if (columnName === "Modified" && uniqueValue) {
@@ -73,6 +79,18 @@ class PagesService {
     }
   };
 
+  /**
+   * Retrieves a page of filtered Site Pages items.
+   *
+   * @param pageNumber The page number to retrieve (1-indexed).
+   * @param pageSize The number of items to retrieve per page. Defaults to 10.
+   * @param orderBy The column to sort the items by. Defaults to "Created".
+   * @param isAscending Whether to sort in ascending or descending order. Defaults to true.
+   * @param folderPath The folder path to search in. Defaults to "" (root of the site).
+   * @param searchText Text to search for in the Title, Article ID, or Modified columns.
+   * @param filters An array of FilterDetail objects to apply to the query.
+   * @returns A promise that resolves with an array of items.
+   */
   getFilteredPages = async (
     pageNumber: number,
     pageSize: number = 10,
@@ -86,23 +104,31 @@ class PagesService {
       const skip = (pageNumber - 1) * pageSize;
       const list = this._sp.web.lists.getByTitle("Site Pages");
 
-      // Use startswith to include files in subfolders and exclude folders
+      /**
+       * Generates a filter query string based on the provided filters.
+       *
+       */
       let filterQuery = `startswith(FileDirRef, '${folderPath}') and FSObjType eq 0${
         searchText
           ? ` and (substringof('${searchText}', Title) or Article_x0020_ID eq '${searchText}' or substringof('${searchText}', Modified))`
           : ""
       }`;
 
+      // Append filter conditions based on the provided filters.
       filters.forEach((filter) => {
         if (filter.values.length > 0) {
+          // Append filter conditions to the filter query for each filter.
           if (filter.filterColumn === "Categories") {
+            // Append category filters to the filter query.
             const categoryFilters = filter.values
               .map((value) => `TaxCatchAll/Term eq '${value}'`)
               .join(" or ");
             filterQuery += ` and (${categoryFilters})`;
           } else if (filter.filterColumn === "Modified") {
+            // Append date filters to the filter query.
             const dateFilters = filter.values
               .map((value) => {
+                // Generate start and end dates for the filter.
                 const startDate = new Date(value);
                 const endDate = new Date(value);
                 endDate.setDate(endDate.getDate() + 1); // Include the entire day
@@ -112,6 +138,7 @@ class PagesService {
               .join(" or ");
             filterQuery += ` and (${dateFilters})`;
           } else {
+            // Append column filters to the filter query.
             const columnFilters = filter.values
               .map((value) => `${filter.filterColumn} eq '${value}'`)
               .join(" or ");
@@ -120,9 +147,16 @@ class PagesService {
         }
       });
 
+      /**
+       * Retrieves the items from the SharePoint list based on the provided filter query,
+       * selects specific columns, expands the TaxCatchAll field, applies pagination,
+       * and orders the results.
+       *
+       */
       const pages: any[] = await list.items
         .filter(filterQuery)
         .select(
+          // Select the required columns
           "Title",
           "Description",
           "FileLeafRef",
@@ -132,9 +166,9 @@ class PagesService {
           "TaxCatchAll/Term",
           "Article_x0020_ID"
         )
-        .expand("TaxCatchAll")
-        .skip(skip)
-        .orderBy(orderBy, isAscending)();
+        .expand("TaxCatchAll") // Expand the TaxCatchAll field to get the Term value
+        .skip(skip) // Apply pagination by skipping the specified number of items
+        .orderBy(orderBy, isAscending)(); // Order the results based on the specified column and sort order
 
       return pages;
     } catch (error) {
